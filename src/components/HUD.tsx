@@ -1,5 +1,5 @@
 import React from 'react'
-import { DaySnapshot, getOverallProgress, PLAN_DURATION, PROJECT_NAME } from '../data/constructionData'
+import { DaySnapshot, getOverallProgress, PLAN_DURATION, PROJECT_NAME, getRectificationCount } from '../data/constructionData'
 
 interface Props {
   snapshot: DaySnapshot
@@ -9,6 +9,7 @@ interface Props {
 const HUD: React.FC<Props> = ({ snapshot, dayIndex }) => {
   const overall = getOverallProgress(snapshot)
   const usedDays = dayIndex + 1
+  const rectCount = getRectificationCount(snapshot)
 
   return (
     <div className="hud-bar">
@@ -35,6 +36,12 @@ const HUD: React.FC<Props> = ({ snapshot, dayIndex }) => {
         <span className="hud-label">施工人数</span>
         <span className="hud-value green">{snapshot.workerCount}人</span>
       </div>
+      {rectCount > 0 && (
+        <div className="hud-item">
+          <span className="hud-label">待整改楼层</span>
+          <span className="hud-value amber">{rectCount}层</span>
+        </div>
+      )}
     </div>
   )
 }

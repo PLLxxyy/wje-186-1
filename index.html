@@ -129,11 +129,57 @@
       box-shadow: 0 0 20px rgba(56, 189, 248, 0.15);
     }
 
+    .floor-card.rectification {
+      border-color: rgba(251, 191, 36, 0.4);
+      background: rgba(30, 41, 59, 0.9);
+    }
+
+    .floor-card.rectification:hover {
+      border-color: rgba(251, 191, 36, 0.7);
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.15);
+    }
+
+    .rect-tag {
+      font-size: 10px;
+      padding: 1px 7px;
+      border-radius: 8px;
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+      font-weight: 600;
+      animation: pulse-rect 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-rect {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+
     .floor-card-header {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
       margin-bottom: 8px;
+    }
+
+    .floor-progress-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 4px;
+    }
+
+    .floor-progress-label {
+      color: #64748b;
+    }
+
+    .floor-progress-value {
+      color: #cbd5e1;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .floor-progress-value.accepted {
+      color: #4ade80;
     }
 
     .floor-name {
@@ -193,11 +239,11 @@
       transition: width 0.4s ease;
     }
 
-    .task-pct {
-      width: 36px;
+    .task-inspection {
+      width: 48px;
       text-align: right;
-      color: #cbd5e1;
-      font-size: 11px;
+      font-size: 10px;
+      font-weight: 500;
       font-variant-numeric: tabular-nums;
     }
 
@@ -315,6 +361,24 @@
     .tooltip-val {
       font-weight: 600;
       color: #e2e8f0;
+    }
+
+    .tooltip-rect-badge {
+      display: inline-block;
+      margin-left: 8px;
+      font-size: 10px;
+      padding: 2px 7px;
+      border-radius: 8px;
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+      font-weight: 600;
+      vertical-align: middle;
+    }
+
+    .tooltip-divider {
+      height: 1px;
+      background: rgba(56, 189, 248, 0.15);
+      margin: 8px 0;
     }
   </style>
 </head>

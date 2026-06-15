@@ -1,10 +1,12 @@
 // 建筑施工进度模拟数据
 
 export type TaskStatus = 'completed' | 'in-progress' | 'pending'
+export type InspectionStatus = 'accepted' | 'pending' | 'rejected'
 
 export interface Task {
   name: string
   progress: number // 0-100
+  inspection: InspectionStatus
 }
 
 export interface FloorData {
@@ -39,21 +41,35 @@ function seededRandom(seed: number): () => number {
   }
 }
 
+function getInspectionStatus(progress: number, rand: () => number): InspectionStatus {
+  if (progress < 100) return 'pending'
+  const r = rand()
+  if (r < 0.55) return 'accepted'
+  if (r < 0.8) return 'pending'
+  return 'rejected'
+}
+
 function generateDayData(dayIndex: number): DaySnapshot {
   const rand = seededRandom(dayIndex * 137 + 42)
-  const date = new Date(2026, 0, 6 + dayIndex) // 2026-01-06 开始
+  const date = new Date(2026, 0, 6 + dayIndex)
   const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 
   const floors: FloorData[] = []
   for (let f = 1; f <= TOTAL_FLOORS; f++) {
     const floorRatio = f / TOTAL_FLOORS
-    const timeRatio = dayIndex / 59 // 60天工期
-    const baseProgress = Math.max(0, Math.min(100, (timeRatio - (floorRatio - 0.06) * 0.8) * 250))
+    const timeRatio = dayIndex / 59
+    const baseProgress = Math.max(0, Math.min(100, (timeRatio - floorRatio * 0.7) * 160))
 
     const tasks: Task[] = TASK_TYPES.map((name, ti) => {
-      const offset = ti * 12
-      const raw = baseProgress - offset + (rand() - 0.5) * 18
-      return { name, progress: Math.max(0, Math.min(100, Math.round(raw))) }
+      const taskRand = seededRandom(dayIndex * 137 + f * 31 + ti * 17 + 42)
+      const offset = ti * 8
+      const raw = baseProgress - offset + (taskRand() - 0.5) * 15
+      let progress = Math.max(0, Math.min(100, Math.round(raw)))
+      if (progress >= 88 && progress < 100 && taskRand() < 0.7) {
+        progress = 100
+      }
+      const inspection = getInspectionStatus(progress, () => taskRand())
+      return { name, progress, inspection }
     })
 
     floors.push({
@@ -71,24 +87,46 @@ function generateDayData(dayIndex: number): DaySnapshot {
   return { date: dateStr, workerCount, floors }
 }
 
-// 预生成60天数据
 export const ALL_SNAPSHOTS: DaySnapshot[] = Array.from({ length: 60 }, (_, i) => generateDayData(i))
 
 export const PROJECT_NAME = '鑫苑·未来城 3#楼'
-export const PLAN_DURATION = 60 // 计划工期天数
+export const PLAN_DURATION = 60
 
 export function getFloorStatus(floor: FloorData): TaskStatus {
-  const avg = floor.tasks.reduce((s, t) => s + t.progress, 0) / floor.tasks.length
-  if (avg >= 99.5) return 'completed'
-  if (avg > 0.5) return 'in-progress'
+  const allAccepted = floor.tasks.every((t) => t.progress >= 100 && t.inspection === 'accepted')
+  if (allAccepted) return 'completed'
+  const anyStarted = floor.tasks.some((t) => t.progress > 0.5)
+  if (anyStarted) return 'in-progress'
   return 'pending'
+}
+
+export function hasRectification(floor: FloorData): boolean {
+  return floor.tasks.some((t) => t.inspection === 'rejected')
 }
 
 export function getFloorAvgProgress(floor: FloorData): number {
   return Math.round(floor.tasks.reduce((s, t) => s + t.progress, 0) / floor.tasks.length)
 }
 
+export function getAcceptedProgress(floor: FloorData): number {
+  const acceptedCount = floor.tasks.filter((t) => t.progress >= 100 && t.inspection === 'accepted').length
+  return Math.round((acceptedCount / floor.tasks.length) * 100)
+}
+
 export function getOverallProgress(snapshot: DaySnapshot): number {
   const total = snapshot.floors.reduce((s, f) => s + getFloorAvgProgress(f), 0)
   return Math.round(total / snapshot.floors.length)
+}
+
+export function getRectificationCount(snapshot: DaySnapshot): number {
+  return snapshot.floors.filter((f) => hasRectification(f)).length
+}
+
+export function getInspectionLabel(status: InspectionStatus): string {
+  const labels: Record<InspectionStatus, string> = {
+    accepted: '验收通过',
+    pending: '待验收',
+    rejected: '需整改',
+  }
+  return labels[status]
 }
