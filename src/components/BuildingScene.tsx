@@ -1,8 +1,8 @@
-import React, { useRef, useState, useCallback, useMemo } from 'react'
+import React, { useRef, useCallback, useMemo } from 'react'
 import * as THREE from 'three'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Environment } from '@react-three/drei'
-import { DaySnapshot, getFloorStatus, getFloorAvgProgress, FloorData, hasRectification, InspectionStatus } from '../data/constructionData'
+import { DaySnapshot, getFloorStatus, FloorData, hasRectification, InspectionStatus, Task } from '../data/constructionData'
 
 const FLOOR_W = 6
 const FLOOR_H = 1.05
@@ -16,47 +16,125 @@ const FLOOR_COLORS: Record<string, string> = {
 }
 
 const RECTIFICATION_COLOR = '#fbbf24'
+const PENDING_COLOR = '#64748b'
+const ACCEPTED_COLOR = '#4ade80'
 
 const INSPECTION_COLORS: Record<InspectionStatus, string> = {
-  accepted: '#4ade80',
-  pending: '#64748b',
-  rejected: '#fbbf24',
+  accepted: ACCEPTED_COLOR,
+  pending: PENDING_COLOR,
+  rejected: RECTIFICATION_COLOR,
 }
 
-interface TaskIndicatorProps {
-  taskIndex: number
-  totalTasks: number
-  inspection: InspectionStatus
-  y: number
+interface TaskBarProps {
+  task: Task
+  index: number
+  total: number
 }
 
-function TaskIndicator({ taskIndex, totalTasks, inspection, y }: TaskIndicatorProps) {
-  const meshRef = useRef<THREE.Mesh>(null!)
-  const color = INSPECTION_COLORS[inspection]
+function TaskBar({ task, index, total }: TaskBarProps) {
+  const fillRef = useRef<THREE.Mesh>(null!)
+  const glowRef = useRef<THREE.Mesh>(null!)
+  const topLightRef = useRef<THREE.Mesh>(null!)
+  const { inspection, progress } = task
   const isRejected = inspection === 'rejected'
+  const isAccepted = inspection === 'accepted'
+  const isPending = inspection === 'pending'
+  const barColor = INSPECTION_COLORS[inspection]
 
-  const spacing = (FLOOR_W - 0.8) / (totalTasks - 1)
-  const x = -FLOOR_W / 2 + 0.4 + taskIndex * spacing
+  const barW = 0.75
+  const barH = FLOOR_H * 0.78
+  const spacing = (FLOOR_W - 0.6) / (total - 1)
+  const x = -FLOOR_W / 2 + 0.3 + index * spacing
+  const z = FLOOR_D / 2 + 0.1
+
+  const fillHeight = barH * Math.max(0.05, progress / 100)
 
   useFrame((state) => {
-    if (!meshRef.current) return
     if (isRejected) {
-      const pulse = 0.7 + Math.sin(state.clock.elapsedTime * 3) * 0.3
-      meshRef.current.scale.setScalar(pulse)
+      const pulse = 0.4 + Math.sin(state.clock.elapsedTime * 2.5 + index * 0.5) * 0.6
+      if (glowRef.current) {
+        ;(glowRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.4 + pulse * 0.8
+      }
+      if (topLightRef.current) {
+        ;(topLightRef.current.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.6 + pulse * 0.8
+      }
     }
   })
 
+  const fillY = -barH / 2 + fillHeight / 2
+
   return (
-    <mesh ref={meshRef} position={[x, y + FLOOR_H / 2 + 0.12, FLOOR_D / 2 + 0.02]}>
-      <boxGeometry args={[0.5, 0.12, 0.08]} />
-      <meshStandardMaterial
-        color={color}
-        emissive={color}
-        emissiveIntensity={isRejected ? 0.6 : 0.25}
-        roughness={0.3}
-        metalness={0.2}
-      />
-    </mesh>
+    <group position={[x, 0, z]}>
+      <mesh position={[0, 0, 0]}>
+        <boxGeometry args={[barW, barH, 0.1]} />
+        <meshStandardMaterial
+          color="#0b1220"
+          roughness={0.5}
+          metalness={0.3}
+          transparent
+          opacity={0.98}
+        />
+      </mesh>
+
+      <mesh ref={fillRef} position={[0, fillY, 0.06]}>
+        <boxGeometry args={[barW - 0.12, fillHeight - 0.05, 0.06]} />
+        <meshStandardMaterial
+          color={barColor}
+          emissive={barColor}
+          emissiveIntensity={isRejected ? 0.8 : isAccepted ? 0.55 : 0.3}
+          roughness={0.25}
+          metalness={0.5}
+        />
+      </mesh>
+
+      {isRejected && (
+        <mesh ref={glowRef} position={[0, 0, 0.12]}>
+          <boxGeometry args={[barW + 0.2, barH + 0.2, 0.01]} />
+          <meshStandardMaterial
+            color={RECTIFICATION_COLOR}
+            emissive={RECTIFICATION_COLOR}
+            emissiveIntensity={0.9}
+            transparent
+            opacity={0.35}
+          />
+        </mesh>
+      )}
+
+      <mesh ref={topLightRef} position={[0, FLOOR_H / 2 + 0.18, 0]}>
+        <boxGeometry args={[barW * 0.9, 0.12, FLOOR_D + 0.2]} />
+        <meshStandardMaterial
+          color={barColor}
+          emissive={barColor}
+          emissiveIntensity={isRejected ? 0.9 : isAccepted ? 0.5 : 0.25}
+          roughness={0.3}
+          metalness={0.4}
+          transparent
+          opacity={isPending && progress < 100 ? 0.5 : 0.85}
+        />
+      </mesh>
+
+      {isPending && progress >= 100 && (
+        <mesh position={[0, barH / 2 + 0.1, 0.06]}>
+          <boxGeometry args={[barW, 0.1, 0.06]} />
+          <meshStandardMaterial
+            color={PENDING_COLOR}
+            emissive={PENDING_COLOR}
+            emissiveIntensity={0.6}
+            roughness={0.3}
+          />
+        </mesh>
+      )}
+
+      <mesh position={[0, -barH / 2 - 0.1, 0.06]}>
+        <boxGeometry args={[barW, 0.08, 0.05]} />
+        <meshStandardMaterial
+          color={barColor}
+          emissive={barColor}
+          emissiveIntensity={isRejected ? 0.9 : 0.5}
+          roughness={0.25}
+        />
+      </mesh>
+    </group>
   )
 }
 
@@ -148,14 +226,46 @@ function FloorMesh({ floor, index, snapshot, hovered, setHovered, setTooltipData
       </mesh>
 
       {floor.tasks.map((task, ti) => (
-        <TaskIndicator
+        <TaskBar
           key={task.name}
-          taskIndex={ti}
-          totalTasks={floor.tasks.length}
-          inspection={task.inspection}
-          y={0}
+          task={task}
+          index={ti}
+          total={floor.tasks.length}
         />
       ))}
+
+      {floor.tasks.map((task, ti) => {
+        const barW = 0.7
+        const barH = FLOOR_H * 0.75
+        const spacing = (FLOOR_W - 0.8) / (floor.tasks.length - 1)
+        const x = -FLOOR_W / 2 + 0.4 + ti * spacing
+        const inspColor = INSPECTION_COLORS[task.inspection]
+        const isRej = task.inspection === 'rejected'
+        return (
+          <group key={`back-${task.name}`} position={[x, 0, -FLOOR_D / 2 - 0.08]} rotation={[0, Math.PI, 0]}>
+            <mesh position={[0, 0, 0]}>
+              <boxGeometry args={[barW, barH, 0.08]} />
+              <meshStandardMaterial
+                color="#0f172a"
+                roughness={0.6}
+                metalness={0.2}
+                transparent
+                opacity={0.95}
+              />
+            </mesh>
+            <mesh position={[0, -barH / 2 + Math.max(0.04, task.progress / 100) * barH / 2, 0.05]}>
+              <boxGeometry args={[barW - 0.1, Math.max(0.04, task.progress / 100) * barH - 0.04, 0.05]} />
+              <meshStandardMaterial
+                color={inspColor}
+                emissive={inspColor}
+                emissiveIntensity={isRej ? 0.7 : 0.35}
+                roughness={0.3}
+                metalness={0.4}
+              />
+            </mesh>
+          </group>
+        )
+      })}
 
       {Array.from({ length: 3 }).map((_, wi) => (
         <React.Fragment key={wi}>
